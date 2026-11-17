@@ -15,26 +15,26 @@ class PoseProtoCodecTest {
             sourceHeight = 480,
             rotationDegrees = 90,
             poseDetected = true,
-            normalizedLandmarks = listOf(
+            normalizedLandmarks = List(33) { index ->
                 PoseLandmarkSample(
-                    index = 0,
-                    x = 0.25f,
-                    y = 0.5f,
-                    z = -0.1f,
-                    visibility = 0.95f,
-                    presence = null,
-                ),
-            ),
-            worldLandmarks = listOf(
+                    index = index,
+                    x = index / 100f,
+                    y = (index + 1) / 100f,
+                    z = -index / 200f,
+                    visibility = if (index % 2 == 0) 0.95f else null,
+                    presence = if (index % 3 == 0) 0.88f else null,
+                )
+            },
+            worldLandmarks = List(33) { index ->
                 PoseLandmarkSample(
-                    index = 0,
-                    x = 0.12f,
-                    y = -0.22f,
-                    z = 1.4f,
-                    visibility = null,
-                    presence = 0.88f,
-                ),
-            ),
+                    index = index,
+                    x = index / 10f,
+                    y = -index / 20f,
+                    z = 1f + index / 30f,
+                    visibility = if (index % 2 == 1) 0.9f else null,
+                    presence = if (index % 4 == 0) 0.8f else null,
+                )
+            },
         )
 
         assertEquals(frame, PoseProtoCodec.decode(PoseProtoCodec.encode(frame)))
