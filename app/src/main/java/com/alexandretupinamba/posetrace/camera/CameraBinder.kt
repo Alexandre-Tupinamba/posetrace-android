@@ -32,8 +32,12 @@ fun bindRearCamera(
             {
                 try {
                     val cameraProvider = cameraProviderFuture.get()
-                    @Surface.Rotation
-                    val rotation: Int = previewView.display?.rotation ?: Surface.ROTATION_0
+                    val rotation = when (previewView.display?.rotation) {
+                        Surface.ROTATION_90 -> Surface.ROTATION_90
+                        Surface.ROTATION_180 -> Surface.ROTATION_180
+                        Surface.ROTATION_270 -> Surface.ROTATION_270
+                        else -> Surface.ROTATION_0
+                    }
                     val viewPort = previewView.viewPort
                         ?: error("PreviewView ViewPort is not available after layout")
 
