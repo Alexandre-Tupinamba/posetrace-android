@@ -37,8 +37,8 @@ class PoseRecordingControllerTest {
         assertFalse(controller.record(frame(index = 1L, cameraTimestampNs = 150L)))
 
         awaitState(controller, RecordingState.FAILED)
+        awaitWriterAbort(writer, RecordingState.FAILED)
 
-        assertEquals(RecordingState.FAILED, writer.abortedState)
         assertTrue(controller.status.value.error!!.contains("Non-monotonic"))
         controller.close()
     }
@@ -52,8 +52,8 @@ class PoseRecordingControllerTest {
         assertTrue(controller.record(frame(index = 0L, cameraTimestampNs = 100L)))
 
         awaitState(controller, RecordingState.FAILED)
+        awaitWriterAbort(writer, RecordingState.FAILED)
 
-        assertEquals(RecordingState.FAILED, writer.abortedState)
         assertTrue(controller.status.value.error!!.contains("writer failed", ignoreCase = true))
         controller.close()
     }
@@ -79,6 +79,18 @@ class PoseRecordingControllerTest {
             Thread.sleep(10L)
         }
         assertEquals(expected, controller.status.value.state)
+    }
+
+    private fun awaitWriterAbort(
+        writer: TestWriter,
+        expected: RecordingState,
+    ) {
+        val deadline = System.nanoTime() + 2_000_000_000L
+        while (System.nanoTime() < deadline) {
+            if (writer.abortedState == expected) return
+            Thread.sleep(10L)
+        }
+        assertEquals(expected, writer.abortedState)
     }
 
     private fun frame(index: Long, cameraTimestampNs: Long): PoseFrame =
