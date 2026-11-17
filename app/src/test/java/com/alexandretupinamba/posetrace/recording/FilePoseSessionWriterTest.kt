@@ -30,6 +30,23 @@ class FilePoseSessionWriterTest {
         assertTrue(manifest.readText().contains("\"state\": \"COMPLETED\""))
         assertTrue(manifest.readText().contains("\"frameCount\": 2"))
 
+        val files = directory.listFiles().orEmpty().map { it.name }.toSet()
+        assertEquals(
+            setOf(
+                FilePoseSessionWriter.COMPLETED_DATA_FILE,
+                FilePoseSessionWriter.MANIFEST_FILE,
+            ),
+            files,
+        )
+        assertTrue(
+            files.none { name ->
+                name.endsWith(".jpg", ignoreCase = true) ||
+                    name.endsWith(".jpeg", ignoreCase = true) ||
+                    name.endsWith(".png", ignoreCase = true) ||
+                    name.endsWith(".mp4", ignoreCase = true)
+            },
+        )
+
         val timestamps = FileInputStream(completedFile).use { input ->
             buildList {
                 while (true) {
