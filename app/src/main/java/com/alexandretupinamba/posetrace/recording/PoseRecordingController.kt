@@ -22,7 +22,6 @@ internal class PoseRecordingController(
 ) : AutoCloseable {
     private val stateMachine = RecordingStateMachine()
     private val lifecycleLock = Any()
-    private val frameLock = Any()
     private val framesEnqueued = AtomicLong(0L)
     private val framesWritten = AtomicLong(0L)
 
@@ -83,27 +82,26 @@ internal class PoseRecordingController(
     }
 
     fun record(frame: PoseFrame): Boolean {
-        if (stateMachine.state != RecordingState.RECORDING) return false
-
-        synchronized(frameLock) {
+        synchronized(lifecycleLock) {
             if (stateMachine.state != RecordingState.RECORDING) return false
 
             val previousTimestamp = lastEnqueuedCameraTimestampNs
             if (previousTimestamp != null && frame.cameraTimestampNs <= previousTimestamp) {
-                fail(
+                markFailedLocked(
                     "Non-monotonic camera timestamp: " +
                         "$previousTimestamp -> ${frame.cameraTimestampNs}",
                 )
                 return false
             }
 
-            val frameQueue = queue ?: run {
-                fail("Recording queue is unavailable")
+            val frameQueue = queue
+            if (frameQueue == null) {
+                markFailedLocked("Recording queue is unavailable")
                 return false
             }
 
             if (!frameQueue.offer(frame)) {
-                fail("Recording buffer overflow at capacity $queueCapacity")
+                markFailedLocked("Recording buffer overflow at capacity $queueCapacity")
                 return false
             }
 
