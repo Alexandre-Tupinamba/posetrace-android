@@ -4,11 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import com.alexandretupinamba.posetrace.pose.PoseLandmarkerEngine
 import com.alexandretupinamba.posetrace.recording.PoseRecordingController
 import com.alexandretupinamba.posetrace.ui.PoseTraceSpikeScreen
+import com.alexandretupinamba.posetrace.ui.theme.PoseTraceTheme
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -37,14 +36,12 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            MaterialTheme {
-                Surface {
-                    PoseTraceSpikeScreen(
-                        poseEngine = poseEngine,
-                        cameraExecutor = cameraExecutor,
-                        recordingController = recordingController,
-                    )
-                }
+            PoseTraceTheme {
+                PoseTraceSpikeScreen(
+                    poseEngine = poseEngine,
+                    cameraExecutor = cameraExecutor,
+                    recordingController = recordingController,
+                )
             }
         }
     }
