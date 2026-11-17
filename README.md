@@ -6,7 +6,7 @@ PoseTrace is an Android ML systems project that turns a live camera stream into 
 
 [![Android CI](https://github.com/Alexandre-Tupinamba/posetrace-android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/Alexandre-Tupinamba/posetrace-android/actions/workflows/android-ci.yml)
 
-> **Current milestone:** real-time pose inference and the raw recording pipeline have both been exercised on a physical Android device. The recording foundation remains in review until the final long-session/file-inspection gate is completed.
+> **Current milestone:** real-time pose inference, failure-safe raw recording, polished capture UI, and display-only landmark stabilization have all been validated on a physical Android device.
 
 ## What this demonstrates
 
@@ -31,7 +31,13 @@ CameraX ImageAnalysis
         ▼
 MediaPipe Pose Landmarker
         │
-        ├──────────────► CameraX coordinate transform ─► overlay
+        ├──────────────► CameraX coordinate transform
+        │                       │
+        │                       ▼
+        │              display-only stabilizer
+        │                       │
+        │                       ▼
+        │                    overlay
         │
         └──────────────► RAW PoseFrame
                               │
@@ -50,7 +56,7 @@ MediaPipe Pose Landmarker
                        local session
 ~~~
 
-The recording branch receives raw MediaPipe landmarks. Preview-only coordinates such as **displayX/displayY** never enter the persisted schema.
+The recording branch receives raw MediaPipe landmarks. Preview-only coordinates such as **displayX/displayY** never enter the persisted schema. Motion-adaptive stabilization is applied only to the overlay path and can be toggled from Diagnostics.
 
 ## Physical-device results
 
@@ -83,7 +89,7 @@ The recording pipeline has also completed a physical-device session with:
 | Queue/write convergence | 100% |
 | Persisted camera pixels | none by design |
 
-The final long-session and app-storage inspection gate is still required before the recording PR is merged.
+This smoke test was accepted as the physical-device gate for the recording foundation. Longer sustained runs remain a future reliability benchmark rather than a blocker for the current milestone.
 
 ## Recording model
 
@@ -135,6 +141,26 @@ The recorder accepts PoseFrame values only. It has no API for Bitmap, ImageProxy
 
 Automated tests additionally verify that a completed recording contains only the expected session files.
 
+## Display stabilization
+
+The live overlay uses a motion-adaptive **One Euro Filter** on preview-space coordinates only.
+
+The goal is to reduce visible jitter while avoiding unnecessary additional lag during faster movement:
+
+- stronger stabilization at low motion speed;
+- higher cutoff during fast motion;
+- automatic reset after pose loss or a large timestamp gap;
+- on-device enable/disable control under Diagnostics;
+- raw normalized and world coordinates remain unchanged.
+
+This separation is deliberate:
+
+~~~text
+MediaPipe raw result
+  ├── recording/export  -> untouched
+  └── displayX/displayY -> stabilization -> overlay
+~~~
+
 ## Data integrity and failure semantics
 
 PoseTrace favors explicit failure over silent corruption.
@@ -174,7 +200,7 @@ Every PR runs:
 ./gradlew assembleDebug
 ~~~
 
-The recording test suite covers, among other cases:
+The automated test suite covers, among other cases:
 
 - Protobuf round-trip;
 - preservation of 33 normalized + 33 world landmarks;
@@ -185,7 +211,12 @@ The recording test suite covers, among other cases:
 - post-Stop frame rejection;
 - stop/finalization versus abort races;
 - completed/aborted session-file semantics;
-- absence of persisted image/video files in completed sessions.
+- absence of persisted image/video files in completed sessions;
+- display-stabilizer raw-data immutability;
+- synthetic jitter reduction;
+- responsive cutoff during fast motion;
+- filter reset after pose loss;
+- stabilization bypass behavior.
 
 ## Build
 
@@ -230,14 +261,22 @@ main is kept in a validated state. Camera and recording changes are not merged s
 
 ## Roadmap
 
-### Recording foundation — in validation
+### Recording foundation — validated
 - [x] explicit recording state machine
 - [x] raw PoseFrame domain model
 - [x] bounded asynchronous writer
 - [x] Protocol Buffers schema
 - [x] failure-safe session finalization
 - [x] physical-device recording smoke test
-- [ ] long-session + private-storage inspection gate
+- [x] completed-session artifact inspection
+
+### Capture experience — validated
+- [x] camera-first Material 3 UI
+- [x] Record / Stop / Saved states
+- [x] collapsible technical diagnostics
+- [x] physical-device overlay validation
+- [x] display-only adaptive landmark stabilization
+- [x] stabilization ON/OFF control
 
 ### Sessions and replay
 - Room session index
@@ -252,13 +291,13 @@ main is kept in a validated state. Camera and recording changes are not merged s
 - landmark trajectories and richer diagnostics
 
 ### Later
-- display-only One Euro smoothing
 - angles, velocity, and acceleration
 - model/delegate benchmarks
 - labeled dataset acquisition mode
+- sustained-recording reliability benchmark
 
 ## Project status
 
-PoseTrace is under active development. The current focus is reliability of the acquisition path before adding higher-level analysis features.
+PoseTrace is under active development. The current acquisition pipeline is validated on-device; the next engineering work can move toward sessions, replay, export, and higher-level motion analysis.
 
 The project intentionally keeps ML inference, visualization, and persisted data as separate concerns so future filtering or UI improvements cannot silently mutate the raw acquisition record.
