@@ -1,6 +1,8 @@
 package com.alexandretupinamba.posetrace.pose
 
 import android.graphics.Matrix
+import androidx.annotation.OptIn
+import androidx.camera.view.TransformExperimental
 import androidx.camera.view.transform.OutputTransform
 
 data class PosePoint(
@@ -48,6 +50,7 @@ data class PoseTelemetryState(
     val expiredSubmissionEstimate: Long = 0,
 )
 
+@OptIn(TransformExperimental::class)
 data class PreviewTransformTarget(
     val outputTransform: OutputTransform,
     val width: Int,

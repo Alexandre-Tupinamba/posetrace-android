@@ -6,6 +6,8 @@ import android.view.View
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
+import androidx.annotation.OptIn
+import androidx.camera.view.TransformExperimental
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +42,7 @@ import com.alexandretupinamba.posetrace.pose.PoseLandmarkerEngine
 import com.alexandretupinamba.posetrace.pose.PreviewTransformTarget
 import java.util.concurrent.Executor
 
+@OptIn(TransformExperimental::class)
 @Composable
 fun PoseTraceSpikeScreen(
     poseEngine: PoseLandmarkerEngine,

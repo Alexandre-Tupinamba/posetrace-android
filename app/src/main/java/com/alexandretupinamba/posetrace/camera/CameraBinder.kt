@@ -2,6 +2,7 @@ package com.alexandretupinamba.posetrace.camera
 
 import android.content.Context
 import android.util.Log
+import android.view.Surface
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -31,7 +32,12 @@ fun bindRearCamera(
             {
                 try {
                     val cameraProvider = cameraProviderFuture.get()
-                    val rotation = previewView.display?.rotation ?: 0
+                    val rotation = when (previewView.display?.rotation) {
+                        Surface.ROTATION_90 -> Surface.ROTATION_90
+                        Surface.ROTATION_180 -> Surface.ROTATION_180
+                        Surface.ROTATION_270 -> Surface.ROTATION_270
+                        else -> Surface.ROTATION_0
+                    }
                     val viewPort = previewView.viewPort
                         ?: error("PreviewView ViewPort is not available after layout")
 
