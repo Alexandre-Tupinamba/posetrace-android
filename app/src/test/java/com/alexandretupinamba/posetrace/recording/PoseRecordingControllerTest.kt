@@ -28,6 +28,24 @@ class PoseRecordingControllerTest {
     }
 
     @Test
+    fun frameSubmittedAfterStopIsRejectedAndNeverWritten() {
+        val writer = TestWriter()
+        val controller = controller(writer)
+
+        controller.start()
+        assertTrue(controller.record(frame(index = 0L, cameraTimestampNs = 100L)))
+        controller.stop()
+        assertFalse(controller.record(frame(index = 1L, cameraTimestampNs = 200L)))
+
+        awaitState(controller, RecordingState.COMPLETED)
+
+        assertEquals(listOf(100L), writer.frames.map { it.cameraTimestampNs })
+        assertEquals(1L, controller.status.value.framesEnqueued)
+        assertEquals(1L, controller.status.value.framesWritten)
+        controller.close()
+    }
+
+    @Test
     fun nonMonotonicTimestampFailsSessionExplicitly() {
         val writer = TestWriter()
         val controller = controller(writer)
