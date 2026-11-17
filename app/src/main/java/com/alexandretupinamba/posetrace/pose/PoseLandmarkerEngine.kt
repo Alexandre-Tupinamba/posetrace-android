@@ -7,6 +7,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
+import androidx.annotation.OptIn
 import androidx.camera.view.transform.CoordinateTransform
 import androidx.camera.view.TransformExperimental
 import androidx.camera.view.transform.ImageProxyTransformFactory
@@ -25,7 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-@TransformExperimental
+@OptIn(TransformExperimental::class)
 class PoseLandmarkerEngine(
     context: Context,
 ) : ImageAnalysis.Analyzer, AutoCloseable {
