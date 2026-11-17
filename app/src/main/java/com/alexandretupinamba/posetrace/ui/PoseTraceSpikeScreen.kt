@@ -37,6 +37,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -222,6 +223,8 @@ internal fun PoseTraceSpikeScreen(
                     sourceHeight = telemetry.sourceHeight,
                     rotationDegrees = telemetry.rotationDegrees,
                     coordinateTransformReady = telemetry.coordinateTransformReady,
+                    stabilizationEnabled = telemetry.displayStabilizationEnabled,
+                    onStabilizationChanged = poseEngine::setDisplayStabilizationEnabled,
                 )
             }
 
@@ -578,6 +581,8 @@ private fun DiagnosticsPanel(
     sourceHeight: Int,
     rotationDegrees: Int,
     coordinateTransformReady: Boolean,
+    stabilizationEnabled: Boolean,
+    onStabilizationChanged: (Boolean) -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -592,6 +597,31 @@ private fun DiagnosticsPanel(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
             )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Overlay stabilization",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = "Display only · raw recording stays untouched",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = stabilizationEnabled,
+                    onCheckedChange = onStabilizationChanged,
+                )
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
             DiagnosticRow(
