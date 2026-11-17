@@ -3,6 +3,8 @@ package com.alexandretupinamba.posetrace.recording
 import java.io.File
 import java.nio.file.Files
 import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -42,6 +44,31 @@ class PoseRecordingControllerTest {
         assertEquals(listOf(100L), writer.frames.map { it.cameraTimestampNs })
         assertEquals(1L, controller.status.value.framesEnqueued)
         assertEquals(1L, controller.status.value.framesWritten)
+        controller.close()
+    }
+
+    @Test
+    fun abortCannotOverwriteCompletionOnceFinalizationStarted() {
+        val writer = TestWriter(blockOnComplete = true)
+        val controller = controller(writer)
+
+        controller.start()
+        assertTrue(controller.record(frame(index = 0L, cameraTimestampNs = 100L)))
+        controller.stop()
+
+        assertTrue(writer.completeEntered.await(2L, TimeUnit.SECONDS))
+
+        val abortThread = Thread {
+            controller.abort("activity destroyed during finalization")
+        }.apply { start() }
+
+        writer.releaseComplete.countDown()
+        abortThread.join(2_000L)
+        awaitState(controller, RecordingState.COMPLETED)
+
+        assertTrue(writer.completed)
+        assertEquals(null, writer.abortedState)
+        assertEquals(RecordingState.COMPLETED, controller.status.value.state)
         controller.close()
     }
 
@@ -127,8 +154,11 @@ class PoseRecordingControllerTest {
 
     private class TestWriter(
         private val failOnAppend: Boolean = false,
+        private val blockOnComplete: Boolean = false,
     ) : PoseSessionWriter {
         val frames: MutableList<PoseFrame> = Collections.synchronizedList(mutableListOf())
+        val completeEntered = CountDownLatch(1)
+        val releaseComplete = CountDownLatch(1)
         @Volatile var completed = false
         @Volatile var abortedState: RecordingState? = null
 
@@ -138,6 +168,12 @@ class PoseRecordingControllerTest {
         }
 
         override fun complete(endedAtEpochMs: Long) {
+            completeEntered.countDown()
+            if (blockOnComplete) {
+                check(releaseComplete.await(2L, TimeUnit.SECONDS)) {
+                    "Timed out waiting to release synthetic finalization"
+                }
+            }
             completed = true
         }
 
