@@ -48,6 +48,7 @@ data class PoseTelemetryState(
     val poseDetectedCount: Long = 0,
     val poseMissingCount: Long = 0,
     val expiredSubmissionEstimate: Long = 0,
+    val displayStabilizationEnabled: Boolean = true,
 )
 
 @OptIn(TransformExperimental::class)

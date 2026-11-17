@@ -49,6 +49,8 @@ class PoseLandmarkerEngine(
     private val resultElapsedWindow = ArrayDeque<Long>()
     private val windowLock = Any()
 
+    private val displayStabilizer = DisplayPoseStabilizer()
+
     private val imageProxyTransformFactory = ImageProxyTransformFactory().apply {
         // MediaPipe receives the ImageProxy crop after its rotation has been physically applied.
         setUsingCropRect(true)
@@ -84,6 +86,11 @@ class PoseLandmarkerEngine(
     ) {
         rawFrameListener = listener
         rawFrameErrorListener = onError
+    }
+
+    fun setDisplayStabilizationEnabled(enabled: Boolean) {
+        displayStabilizer.setEnabled(enabled)
+        _state.update { it.copy(displayStabilizationEnabled = enabled) }
     }
 
     private fun initialize() {
@@ -260,7 +267,7 @@ class PoseLandmarkerEngine(
                 missingCount.incrementAndGet()
             }
 
-            val points = normalizedPose.orEmpty().mapIndexed { landmarkIndex, landmark ->
+            val rawDisplayPoints = normalizedPose.orEmpty().mapIndexed { landmarkIndex, landmark ->
                 val world = worldPose?.getOrNull(landmarkIndex)
                 val display = mapToPreview(
                     normalizedX = landmark.x(),
@@ -283,6 +290,16 @@ class PoseLandmarkerEngine(
                     displayX = display?.first,
                     displayY = display?.second,
                 )
+            }
+
+            val points = if (detected) {
+                displayStabilizer.stabilize(
+                    points = rawDisplayPoints,
+                    timestampNs = metadata?.cameraTimestampNs ?: receivedElapsedNs,
+                )
+            } else {
+                displayStabilizer.reset()
+                emptyList()
             }
 
             val latencyNs = metadata?.let { receivedElapsedNs - it.submitElapsedNs } ?: 0L
@@ -481,6 +498,7 @@ class PoseLandmarkerEngine(
     }
 
     override fun close() {
+        displayStabilizer.reset()
         poseLandmarker?.close()
         poseLandmarker = null
         submittedFrames.clear()
