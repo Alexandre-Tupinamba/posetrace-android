@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package posetrace.recording.v1;
+
+option java_package = "com.alexandretupinamba.posetrace.recording.proto";
+option java_multiple_files = true;
+option java_outer_classname = "PoseRecordingSchema";
+
+message PoseLandmarkRecord {
+  uint32 index = 1;
+  float x = 2;
+  float y = 3;
+  float z = 4;
+  optional float visibility = 5;
+  optional float presence = 6;
+}
+
+message PoseFrameRecord {
+  uint64 analyzer_frame_index = 1;
+  uint64 camera_timestamp_ns = 2;
+  uint64 mediapipe_timestamp_ms = 3;
+  uint64 inference_latency_ns = 4;
+  uint32 source_width = 5;
+  uint32 source_height = 6;
+  uint32 rotation_degrees = 7;
+  bool pose_detected = 8;
+  repeated PoseLandmarkRecord normalized_landmarks = 9;
+  repeated PoseLandmarkRecord world_landmarks = 10;
+}

@@ -11,6 +11,8 @@ import androidx.annotation.OptIn
 import androidx.camera.view.transform.CoordinateTransform
 import androidx.camera.view.TransformExperimental
 import androidx.camera.view.transform.ImageProxyTransformFactory
+import com.alexandretupinamba.posetrace.recording.PoseFrame
+import com.alexandretupinamba.posetrace.recording.PoseLandmarkSample
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.framework.image.MPImage
 import com.google.mediapipe.tasks.core.BaseOptions
@@ -62,12 +64,26 @@ class PoseLandmarkerEngine(
     @Volatile
     private var previewTransformTarget: PreviewTransformTarget? = null
 
+    @Volatile
+    private var rawFrameListener: ((PoseFrame) -> Unit)? = null
+
+    @Volatile
+    private var rawFrameErrorListener: ((String) -> Unit)? = null
+
     init {
         initialize()
     }
 
     fun setPreviewTransformTarget(target: PreviewTransformTarget?) {
         previewTransformTarget = target
+    }
+
+    fun setRawFrameListener(
+        listener: ((PoseFrame) -> Unit)?,
+        onError: ((String) -> Unit)? = null,
+    ) {
+        rawFrameListener = listener
+        rawFrameErrorListener = onError
     }
 
     private fun initialize() {
@@ -271,6 +287,14 @@ class PoseLandmarkerEngine(
 
             val latencyNs = metadata?.let { receivedElapsedNs - it.submitElapsedNs } ?: 0L
 
+            publishRawFrame(
+                metadata = metadata,
+                resultTimestampMs = result.timestampMs(),
+                latencyNs = latencyNs,
+                normalizedPose = normalizedPose,
+                worldPose = worldPose,
+            )
+
             _state.update { current ->
                 current.copy(
                     initialized = true,
@@ -300,6 +324,58 @@ class PoseLandmarkerEngine(
         } finally {
             input.close()
         }
+    }
+
+    private fun publishRawFrame(
+        metadata: SubmittedFrame?,
+        resultTimestampMs: Long,
+        latencyNs: Long,
+        normalizedPose: List<com.google.mediapipe.tasks.components.containers.NormalizedLandmark>?,
+        worldPose: List<com.google.mediapipe.tasks.components.containers.Landmark>?,
+    ) {
+        val listener = rawFrameListener ?: return
+        if (metadata == null) {
+            rawFrameErrorListener?.invoke(
+                "MediaPipe result $resultTimestampMs ms has no matching CameraX metadata",
+            )
+            return
+        }
+
+        val normalized = normalizedPose.orEmpty().mapIndexed { index, landmark ->
+            PoseLandmarkSample(
+                index = index,
+                x = landmark.x(),
+                y = landmark.y(),
+                z = landmark.z(),
+                visibility = landmark.visibility().orElse(null),
+                presence = landmark.presence().orElse(null),
+            )
+        }
+        val world = worldPose.orEmpty().mapIndexed { index, landmark ->
+            PoseLandmarkSample(
+                index = index,
+                x = landmark.x(),
+                y = landmark.y(),
+                z = landmark.z(),
+                visibility = landmark.visibility().orElse(null),
+                presence = landmark.presence().orElse(null),
+            )
+        }
+
+        listener(
+            PoseFrame(
+                analyzerFrameIndex = metadata.analyzerFrameIndex,
+                cameraTimestampNs = metadata.cameraTimestampNs,
+                mediaPipeTimestampMs = resultTimestampMs,
+                inferenceLatencyNs = latencyNs.coerceAtLeast(0L),
+                sourceWidth = metadata.sourceWidth,
+                sourceHeight = metadata.sourceHeight,
+                rotationDegrees = metadata.rotationDegrees,
+                poseDetected = normalized.isNotEmpty(),
+                normalizedLandmarks = normalized,
+                worldLandmarks = world,
+            ),
+        )
     }
 
     private fun mapToPreview(
@@ -409,6 +485,8 @@ class PoseLandmarkerEngine(
         poseLandmarker = null
         submittedFrames.clear()
         previewTransformTarget = null
+        rawFrameListener = null
+        rawFrameErrorListener = null
     }
 
     companion object {
