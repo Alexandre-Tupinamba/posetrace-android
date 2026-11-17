@@ -40,17 +40,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexandretupinamba.posetrace.camera.bindRearCamera
 import com.alexandretupinamba.posetrace.pose.PoseLandmarkerEngine
 import com.alexandretupinamba.posetrace.pose.PreviewTransformTarget
+import com.alexandretupinamba.posetrace.recording.PoseRecordingController
+import com.alexandretupinamba.posetrace.recording.RecordingState
+import com.alexandretupinamba.posetrace.recording.RecordingStatus
 import java.util.concurrent.Executor
 
 @OptIn(TransformExperimental::class)
 @Composable
-fun PoseTraceSpikeScreen(
+internal fun PoseTraceSpikeScreen(
     poseEngine: PoseLandmarkerEngine,
     cameraExecutor: Executor,
+    recordingController: PoseRecordingController,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val telemetry by poseEngine.state.collectAsStateWithLifecycle()
+    val recording by recordingController.status.collectAsStateWithLifecycle()
 
     var cameraError by remember { mutableStateOf<String?>(null) }
     var hasCameraPermission by remember {
@@ -162,6 +167,18 @@ fun PoseTraceSpikeScreen(
             landmarks = telemetry.landmarks,
         )
 
+        RecordingControls(
+            status = recording,
+            onStart = {
+                runCatching { recordingController.start() }
+            },
+            onStop = recordingController::stop,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .safeDrawingPadding()
+                .padding(12.dp),
+        )
+
         TelemetryCard(
             initialized = telemetry.initialized,
             poseDetected = telemetry.poseDetected,
@@ -185,6 +202,56 @@ fun PoseTraceSpikeScreen(
                 .safeDrawingPadding()
                 .padding(12.dp),
         )
+    }
+}
+
+@Composable
+private fun RecordingControls(
+    status: RecordingStatus,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(
+                        text = "Recording: ${status.state.name}",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Text("Queued / written: ${status.framesEnqueued} / ${status.framesWritten}")
+                    status.sessionId?.let { Text("Session: ${it.take(8)}…") }
+                }
+
+                val busy = status.state == RecordingState.PREPARING ||
+                    status.state == RecordingState.STOPPING
+                Button(
+                    onClick = if (status.state == RecordingState.RECORDING) onStop else onStart,
+                    enabled = !busy,
+                ) {
+                    Text(
+                        if (status.state == RecordingState.RECORDING) {
+                            "Stop"
+                        } else {
+                            "Record"
+                        },
+                    )
+                }
+            }
+
+            status.error?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+        }
     }
 }
 
