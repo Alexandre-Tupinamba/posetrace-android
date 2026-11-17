@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -480,9 +481,9 @@ private fun RecordingPanel(
                 )
                 Icon(
                     imageVector = if (diagnosticsExpanded) {
-                        Icons.Rounded.ExpandMore
-                    } else {
                         Icons.Rounded.ExpandLess
+                    } else {
+                        Icons.Rounded.ExpandMore
                     },
                     contentDescription = null,
                     modifier = Modifier
@@ -653,11 +654,14 @@ private fun DiagnosticRow(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(0.36f),
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodySmall,
             fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.64f),
         )
     }
 }
