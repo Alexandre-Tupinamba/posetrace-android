@@ -153,7 +153,6 @@ internal class PoseRecordingController(
             when (stateMachine.state) {
                 RecordingState.PREPARING,
                 RecordingState.RECORDING,
-                RecordingState.STOPPING,
                 -> markFailedLocked(reason)
                 else -> Unit
             }
@@ -181,12 +180,19 @@ internal class PoseRecordingController(
                 when (stateMachine.state) {
                     RecordingState.STOPPING -> {
                         if (frameQueue.isEmpty()) {
-                            sessionWriter.complete(nowEpochMs())
                             synchronized(lifecycleLock) {
-                                stateMachine.transitionTo(RecordingState.COMPLETED)
-                                publishState(RecordingState.COMPLETED)
+                                if (
+                                    stateMachine.state == RecordingState.STOPPING &&
+                                    frameQueue.isEmpty()
+                                ) {
+                                    // Keep file finalization and the terminal state transition atomic.
+                                    // This prevents ABORTED/FAILED from racing a successful fsync + rename.
+                                    sessionWriter.complete(nowEpochMs())
+                                    stateMachine.transitionTo(RecordingState.COMPLETED)
+                                    publishState(RecordingState.COMPLETED)
+                                    return
+                                }
                             }
-                            return
                         }
                     }
                     RecordingState.ABORTED -> {
@@ -209,17 +215,30 @@ internal class PoseRecordingController(
                 }
             }
         } catch (error: Exception) {
-            synchronized(lifecycleLock) {
-                if (stateMachine.state != RecordingState.FAILED) {
-                    markFailedLocked("Recording writer failed: ${error.message}")
+            val terminalState = synchronized(lifecycleLock) {
+                when (stateMachine.state) {
+                    RecordingState.PREPARING,
+                    RecordingState.RECORDING,
+                    RecordingState.STOPPING,
+                    -> {
+                        markFailedLocked("Recording writer failed: ${error.message}")
+                        RecordingState.FAILED
+                    }
+                    else -> stateMachine.state
                 }
             }
-            runCatching {
-                sessionWriter.abort(
-                    finalState = RecordingState.FAILED,
-                    endedAtEpochMs = nowEpochMs(),
-                    reason = _status.value.error,
-                )
+
+            when (terminalState) {
+                RecordingState.ABORTED,
+                RecordingState.FAILED,
+                -> runCatching {
+                    sessionWriter.abort(
+                        finalState = terminalState,
+                        endedAtEpochMs = nowEpochMs(),
+                        reason = _status.value.error,
+                    )
+                }
+                else -> Unit
             }
         }
     }
@@ -241,9 +260,15 @@ internal class PoseRecordingController(
     }
 
     private fun markFailedLocked(reason: String) {
-        if (stateMachine.state != RecordingState.FAILED) {
-            stateMachine.transitionTo(RecordingState.FAILED)
+        when (stateMachine.state) {
+            RecordingState.PREPARING,
+            RecordingState.RECORDING,
+            RecordingState.STOPPING,
+            -> stateMachine.transitionTo(RecordingState.FAILED)
+            RecordingState.FAILED -> Unit
+            else -> return
         }
+
         queue?.clear()
         _status.update {
             it.copy(
